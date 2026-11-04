@@ -41,33 +41,26 @@
 										</dict>
 									</array>
 									<key>MuteInputAmp</key>
-									<false/>
+									<true/>
 									<key>PublishMute</key>
 									<false/>
 									<key>PublishVolume</key>
-									<true/>
+									<false/>
 									<key>VolumeInputAmp</key>
 									<true/>
 								</dict>
 								<key>NodeID</key>
-								<integer>2</integer>
+								<integer>9</integer>
 							</dict>
 							<dict>
-								<key>Amp</key>
-								<dict>
-									<key>MuteInputAmp</key>
-									<true/>
-									<key>PublishMute</key>
-									<true/>
-									<key>PublishVolume</key>
-									<false/>
-									<key>VolumeInputAmp</key>
-									<false/>
-								</dict>
+								<key>NodeID</key>
+								<integer>34</integer>
+							</dict>
+							<dict>
 								<key>Boost</key>
 								<integer>3</integer>
 								<key>NodeID</key>
-								<integer>33</integer>
+								<integer>25</integer>
 							</dict>
 						</array>
 					</array>
@@ -92,33 +85,26 @@
 										</dict>
 									</array>
 									<key>MuteInputAmp</key>
-									<false/>
+									<true/>
 									<key>PublishMute</key>
 									<false/>
 									<key>PublishVolume</key>
-									<true/>
+									<false/>
 									<key>VolumeInputAmp</key>
 									<true/>
 								</dict>
 								<key>NodeID</key>
-								<integer>3</integer>
+								<integer>7</integer>
 							</dict>
 							<dict>
-								<key>Amp</key>
-								<dict>
-									<key>MuteInputAmp</key>
-									<true/>
-									<key>PublishMute</key>
-									<true/>
-									<key>PublishVolume</key>
-									<false/>
-									<key>VolumeInputAmp</key>
-									<false/>
-								</dict>
+								<key>NodeID</key>
+								<integer>36</integer>
+							</dict>
+							<dict>
 								<key>Boost</key>
 								<integer>3</integer>
 								<key>NodeID</key>
-								<integer>23</integer>
+								<integer>18</integer>
 							</dict>
 						</array>
 					</array>
@@ -127,10 +113,19 @@
 					<array>
 						<array>
 							<dict>
-								<key>Boost</key>
-								<integer>3</integer>
+								<key>Amp</key>
+								<dict>
+									<key>MuteInputAmp</key>
+									<false/>
+									<key>PublishMute</key>
+									<true/>
+									<key>PublishVolume</key>
+									<false/>
+									<key>VolumeInputAmp</key>
+									<false/>
+								</dict>
 								<key>NodeID</key>
-								<integer>25</integer>
+								<integer>23</integer>
 							</dict>
 							<dict>
 								<key>Amp</key>
@@ -151,26 +146,35 @@
 										</dict>
 									</array>
 									<key>MuteInputAmp</key>
-									<true/>
+									<false/>
 									<key>PublishMute</key>
-									<true/>
+									<false/>
 									<key>PublishVolume</key>
 									<true/>
 									<key>VolumeInputAmp</key>
-									<true/>
+									<false/>
 								</dict>
 								<key>NodeID</key>
-								<integer>8</integer>
+								<integer>3</integer>
 							</dict>
 						</array>
 					</array>
 					<array>
 						<array>
 							<dict>
-								<key>Boost</key>
-								<integer>3</integer>
+								<key>Amp</key>
+								<dict>
+									<key>MuteInputAmp</key>
+									<false/>
+									<key>PublishMute</key>
+									<true/>
+									<key>PublishVolume</key>
+									<false/>
+									<key>VolumeInputAmp</key>
+									<false/>
+								</dict>
 								<key>NodeID</key>
-								<integer>18</integer>
+								<integer>33</integer>
 							</dict>
 							<dict>
 								<key>Amp</key>
@@ -191,23 +195,24 @@
 										</dict>
 									</array>
 									<key>MuteInputAmp</key>
-									<true/>
+									<false/>
 									<key>PublishMute</key>
-									<true/>
+									<false/>
 									<key>PublishVolume</key>
 									<true/>
 									<key>VolumeInputAmp</key>
-									<true/>
+									<false/>
 								</dict>
 								<key>NodeID</key>
-								<integer>7</integer>
+								<integer>2</integer>
 							</dict>
 						</array>
 					</array>
 				</array>
 			</array>
 			<key>PathMapID</key>
-			<integer>29</integer>
+			<integer>274</integer>
 		</dict>
 	</array>
 </dict>
+<!-- （注：内容由AI生成） -->
