@@ -38,14 +38,6 @@
 			</dict>
 			<dict>
 				<key>Comment</key>
-				<string>Custom - Realtek ALC274 for Lenovo Tianjiao 16 (17AA:3757)</string>
-				<key>Id</key>
-				<integer>29</integer>
-				<key>Path</key>
-				<string>layout29.xml.zlib</string>
-			</dict>
-			<dict>
-				<key>Comment</key>
 				<string>jackjack1-su Realtek ALC274 for Microsoft Surface Pro 7</string>
 				<key>Id</key>
 				<integer>35</integer>
@@ -59,6 +51,22 @@
 				<integer>39</integer>
 				<key>Path</key>
 				<string>layout39.xml.zlib</string>
+			</dict>
+			<dict>
+				<key>Comment</key>
+				<string>Custom ALC274 for Lenovo Tianjiao 16-ALO (DAC swap test)</string>
+				<key>Id</key>
+				<integer>98</integer>
+				<key>Path</key>
+				<string>layout98.xml.zlib</string>
+			</dict>
+			<dict>
+				<key>Comment</key>
+				<string>Custom ALC274 for Lenovo Tianjiao 16-ALO</string>
+				<key>Id</key>
+				<integer>99</integer>
+				<key>Path</key>
+				<string>layout99.xml.zlib</string>
 			</dict>
 		</array>
 		<key>Platforms</key>
@@ -89,14 +97,6 @@
 			</dict>
 			<dict>
 				<key>Comment</key>
-				<string>Custom - Realtek ALC274 for Lenovo Tianjiao 16 (17AA:3757)</string>
-				<key>Id</key>
-				<integer>29</integer>
-				<key>Path</key>
-				<string>Platforms29.xml.zlib</string>
-			</dict>
-			<dict>
-				<key>Comment</key>
 				<string>jackjack1-su Realtek ALC274 for Microsoft Surface Pro 7</string>
 				<key>Id</key>
 				<integer>35</integer>
@@ -110,6 +110,22 @@
 				<integer>39</integer>
 				<key>Path</key>
 				<string>Platforms39.xml.zlib</string>
+			</dict>
+			<dict>
+				<key>Comment</key>
+				<string>Custom ALC274 for Lenovo Tianjiao 16-ALO (DAC swap test)</string>
+				<key>Id</key>
+				<integer>98</integer>
+				<key>Path</key>
+				<string>Platforms98.xml.zlib</string>
+			</dict>
+			<dict>
+				<key>Comment</key>
+				<string>Custom ALC274 for Lenovo Tianjiao 16-ALO</string>
+				<key>Id</key>
+				<integer>99</integer>
+				<key>Path</key>
+				<string>Platforms99.xml.zlib</string>
 			</dict>
 		</array>
 	</dict>
