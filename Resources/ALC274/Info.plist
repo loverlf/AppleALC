@@ -54,6 +54,30 @@
 			</dict>
 			<dict>
 				<key>Comment</key>
+				<string>Custom ALC274 for Lenovo Tianjiao 16-ALO (DAC swap only, 28 base)</string>
+				<key>Id</key>
+				<integer>95</integer>
+				<key>Path</key>
+				<string>layout95.xml.zlib</string>
+			</dict>
+			<dict>
+				<key>Comment</key>
+				<string>Custom ALC274 for Lenovo Tianjiao 16-ALO (headset mic only, 28 base)</string>
+				<key>Id</key>
+				<integer>96</integer>
+				<key>Path</key>
+				<string>layout96.xml.zlib</string>
+			</dict>
+			<dict>
+				<key>Comment</key>
+				<string>Custom ALC274 for Lenovo Tianjiao 16-ALO (control)</string>
+				<key>Id</key>
+				<integer>97</integer>
+				<key>Path</key>
+				<string>layout97.xml.zlib</string>
+			</dict>
+			<dict>
+				<key>Comment</key>
 				<string>Custom ALC274 for Lenovo Tianjiao 16-ALO (DAC swap test)</string>
 				<key>Id</key>
 				<integer>98</integer>
@@ -110,6 +134,30 @@
 				<integer>39</integer>
 				<key>Path</key>
 				<string>Platforms39.xml.zlib</string>
+			</dict>
+			<dict>
+				<key>Comment</key>
+				<string>Custom ALC274 for Lenovo Tianjiao 16-ALO (DAC swap only, 28 base)</string>
+				<key>Id</key>
+				<integer>95</integer>
+				<key>Path</key>
+				<string>Platforms95.xml.zlib</string>
+			</dict>
+			<dict>
+				<key>Comment</key>
+				<string>Custom ALC274 for Lenovo Tianjiao 16-ALO (headset mic only, 28 base)</string>
+				<key>Id</key>
+				<integer>96</integer>
+				<key>Path</key>
+				<string>Platforms96.xml.zlib</string>
+			</dict>
+			<dict>
+				<key>Comment</key>
+				<string>Custom ALC274 for Lenovo Tianjiao 16-ALO (control)</string>
+				<key>Id</key>
+				<integer>97</integer>
+				<key>Path</key>
+				<string>Platforms97.xml.zlib</string>
 			</dict>
 			<dict>
 				<key>Comment</key>
