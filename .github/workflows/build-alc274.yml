@@ -1,0 +1,52 @@
+name: Build ALC274 (Tianjiao 16)
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # 每周一检查一次：上游更新后自动编译，失败会发邮件
+    - cron: '0 3 * * 1'
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          set -e
+          # MacKernelSDK（AppleALC 头文件依赖）
+          git clone --depth 1 https://github.com/acidanthera/MacKernelSDK.git MacKernelSDK
+          # 最新 Lilu（DEBUG 版，含头文件）
+          url=$(curl -s https://api.github.com/repos/acidanthera/Lilu/releases/latest \
+                | jq -r '.assets[] | select(.name | test("DEBUG")) | .browser_download_url' | head -1)
+          echo "Lilu: $url"
+          curl -L -o /tmp/lilu.zip "$url"
+          unzip -q /tmp/lilu.zip -d /tmp/lilu
+          cp -R /tmp/lilu/Lilu.kext ./Lilu.kext
+
+      - name: Apply ALC274 patch
+        run: |
+          set -e
+          git apply --verbose patches/alc274-tianjiao16.patch
+
+      - name: Build AppleALC
+        run: |
+          set -e
+          xcodebuild -project AppleALC.xcodeproj -target AppleALC \
+            -configuration Release -arch x86_64 \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
+            | tail -40
+          codesign --force --sign - --timestamp=none build/Release/AppleALC.kext
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" build/Release/AppleALC.kext/Contents/Info.plist
+
+      - name: Upload AppleALC.kext
+        uses: actions/upload-artifact@v4
+        with:
+          name: AppleALC-kext-ALC274
+          path: build/Release/AppleALC.kext
+          if-no-files-found: error
