@@ -1,0 +1,259 @@
+diff --git a/AppleALC/kern_alc.cpp b/AppleALC/kern_alc.cpp
+index 5954f1c..e7a1bb9 100644
+--- a/AppleALC/kern_alc.cpp
++++ b/AppleALC/kern_alc.cpp
+@@ -12,6 +12,8 @@
+ #include <IOKit/IOService.h>
+ #include <IOKit/pci/IOPCIDevice.h>
+ #include <mach/vm_map.h>
++#include <kern/thread_call.h>
++#include <kern/clock.h>
+ #include <libkern/c++/OSUnserialize.h>
+ 
+ #include "kern_alc.hpp"
+@@ -382,8 +384,245 @@ bool AlcEnabler::AppleHDAController_start(IOService* service, IOService* provide
+ 	return FunctionCast(AppleHDAController_start, callbackAlc->orgAppleHDAController_start)(service, provider);
+ }
+ 
++// 静音键支持（layout 29 下默认启用，可用 -alc274nokey / -alc274off 关闭）
++// 结论依据：底座静音键不是按键事件，而是"短接 0x1A 检测线"的自锁开关——按一次锁住、
++// 再按一次解锁，状态一直保持。官方 layout 28 里 0x1A 有输入口，AppleHDA 会跟着在 0x12/0x19/0x1A
++// 上做切换；而我们自制的 layout 无论怎么排（0x22 独占、独立 ADC 0x23、ExtMic 带字段）AppleHDA
++// 都不给第三个输入口，0x1A 的通知被彻底关掉。所以改为内核里自己盯着这个脚的状态：
++// 锁住 = 麦克风静音，解锁 = 恢复。不依赖任何上层进程。
++static AlcEnabler *alc274KeySelf = nullptr;
++static void *alc274KeyCtx = nullptr;
++static thread_call_t alc274KeyTimer = nullptr;
++static bool alc274KeyMuted = false;
++static bool alc274KeyApplied = false;
++static unsigned int alc274AmpSaved07 = 0xFFFFFFFFU;
++static unsigned int alc274AmpSaved09 = 0xFFFFFFFFU;
++static uint32_t alc274PinSaved19 = 0xFFFFFFFFU;
++static uint32_t alc274PinSaved12 = 0xFFFFFFFFU;
++
++static IOReturn alc274RawVerb(uint16_t nid, uint16_t verb, uint16_t param, unsigned int *out) {
++	if (!alc274KeySelf || !alc274KeyCtx)
++		return kIOReturnError;
++	return FunctionCast(AlcEnabler::IOHDACodecDevice_executeVerb, alc274KeySelf->orgIOHDACodecDevice_executeVerb)
++		(alc274KeyCtx, nid, verb, param, out, false);
++}
++
++static thread_call_t alc274KeyRetry = nullptr;
++
++// 纯写入：静音 = 把两条采集链的"拾音音量"压到最低（放大器 mute 位置位、增益不动），
++// 同时把输入选择器 0x22 临时切到一条空脚（0x1A），耳机麦的偏置撤掉；全都不用拔链路，
++// 设备仍留在列表里，只是电平归零。恢复时按保存的原值逐项写回。
++static void alc274KeyWrite(bool mute) {
++	unsigned int d = 0;
++	// 只切输入选择器（不改引脚、不改放大器）：把麦克风的信号源换到一条空脚，
++	// 端口、链路、偏置全部保留，效果等于把拾音音量压到 0。
++	//   0x22 idx0 = 0x19 一体孔麦  -> idx1 = 0x1A（空脚/静音键脚）
++	//   0x24 idx0 = 0x12 内建麦    -> idx1 = 0x13（未接线空脚）
++	alc274RawVerb(0x22, 0x701, (uint16_t)(mute ? 0x0001 : 0x0000), &d);
++	alc274RawVerb(0x24, 0x701, (uint16_t)(mute ? 0x0001 : 0x0000), &d);
++}
++
++static void alc274KeyRetryFn(thread_call_param_t, thread_call_param_t) {
++	alc274KeyWrite(alc274KeyMuted);
++}
++
++static void alc274KeyApply(bool mute) {
++	// 开机首次调用：把读到的按键状态只当基线，一律先恢复成"不静音"，
++	// 之后只在锁存状态真的翻转时才动作，避免开机就顶着静音进系统。
++	if (!alc274KeyApplied)
++		mute = false;
++
++	// 首次记下两条采集链的放大器现值与两个麦克风脚的 pin ctl，恢复时按原值写回。
++	if (alc274AmpSaved07 == 0xFFFFFFFFU) {
++		unsigned int v = 0;
++		if (alc274RawVerb(0x07, 0xB00, 0x0000, &v) == kIOReturnSuccess)
++			alc274AmpSaved07 = v;
++	}
++	if (alc274AmpSaved09 == 0xFFFFFFFFU) {
++		unsigned int v = 0;
++		if (alc274RawVerb(0x09, 0xB00, 0x0000, &v) == kIOReturnSuccess)
++			alc274AmpSaved09 = v;
++	}
++	if (alc274PinSaved19 == 0xFFFFFFFFU) {
++		unsigned int v = 0;
++		if (alc274RawVerb(0x19, 0xF07, 0x0000, &v) == kIOReturnSuccess)
++			alc274PinSaved19 = v & 0xFFU;
++		if (alc274PinSaved19 == 0xFFFFFFFFU || alc274PinSaved19 == 0)
++			alc274PinSaved19 = 0x24;
++	}
++	if (alc274PinSaved12 == 0xFFFFFFFFU) {
++		unsigned int v = 0;
++		if (alc274RawVerb(0x12, 0xF07, 0x0000, &v) == kIOReturnSuccess)
++			alc274PinSaved12 = v & 0xFFU;
++		if (alc274PinSaved12 == 0xFFFFFFFFU || alc274PinSaved12 == 0)
++			alc274PinSaved12 = 0x20;
++	}
++
++	alc274KeyMuted = mute;
++	alc274KeyApplied = true;
++	alc274KeyWrite(mute);
++
++	// AppleHDA 处理插孔事件后会把放大器改写回自己的值，延迟再补一次，抢在它后面。
++	if (!alc274KeyRetry)
++		alc274KeyRetry = thread_call_allocate(alc274KeyRetryFn, nullptr);
++	if (alc274KeyRetry)
++		thread_call_enter_delayed(alc274KeyRetry, mach_absolute_time() + 800ULL * 1000 * 1000);
++
++	IOService *svc = (IOService *)alc274KeyCtx;
++	OSNumber *n = nullptr;
++	if (svc && (n = OSNumber::withNumber(mute ? 1 : 0, 32))) {
++		svc->setProperty("alc274key-muted", n);
++		n->release();
++	}
++
++	// 诊断：把静音后各层的实际读回值写进注册表，便于核对该次静音到底落在哪一层、
++	// 以及是否被 AppleHDA 又改写回去。
++	unsigned int r19 = 0, r12 = 0, r22 = 0, r24 = 0;
++	alc274RawVerb(0x19, 0xF07, 0x0000, &r19);
++	alc274RawVerb(0x12, 0xF07, 0x0000, &r12);
++	alc274RawVerb(0x22, 0xF03, 0x0000, &r22);
++	alc274RawVerb(0x24, 0xF03, 0x0000, &r24);
++	if (svc) {
++		const char *names[4] = { "alc274key-ctl19", "alc274key-ctl12", "alc274key-sel22", "alc274key-sel24" };
++		unsigned int vals[4] = { r19, r12, r22, r24 };
++		for (int i = 0; i < 4; i++) {
++			OSNumber *k = OSNumber::withNumber(vals[i], 32);
++			if (k) {
++				svc->setProperty(names[i], k);
++				k->release();
++			}
++		}
++	}
++}
++
++static void alc274KeyPoll(thread_call_param_t, thread_call_param_t) {
++	unsigned int v = 0;
++	IOReturn r = alc274RawVerb(0x1A, 0xF09, 0x0000, &v);
++	if (r == kIOReturnSuccess) {
++		bool latched = (v & 0x80000000U) != 0;
++		if (!alc274KeyApplied || latched != alc274KeyMuted)
++			alc274KeyApply(latched);
++	}
++
++	if (alc274KeyTimer)
++		thread_call_enter_delayed(alc274KeyTimer, mach_absolute_time() + 5ULL * 1000 * 1000 * 1000);
++}
++
+ IOReturn AlcEnabler::IOHDACodecDevice_executeVerb(void *hdaCodecDevice, uint16_t nid, uint16_t verb, uint16_t param, unsigned int *output, bool waitForSuccess)
+ {
++	// 三段钩子只在 layout-id = 29（本仓库为 Lenovo Tianjiao 16 ALO 定制的 layout）上默认启用，
++	// 避免影响其它机型/其它 layout；可用 -alc274off 全局关闭。
++	static bool alc274Checked = false;
++	static bool alc274Here = false;
++	if (!alc274Checked) {
++		// 读不到 layout（返回 0）时不锁定结论，等下一次调用再判，避免钩子被误关
++		uint32_t alc274Layout = AlcEnabler::getAudioLayout((IOService *)hdaCodecDevice);
++		if (alc274Layout != 0) {
++			alc274Checked = true;
++			alc274Here = (alc274Layout == 29);
++		}
++	}
++
++	// 一体孔麦克风偏置（layout 29 下默认启用，可用 -alc274novref / -alc274off 关闭）：AppleHDA 把 0x19 的 pin ctl 写成 0x02
++	// （无 IN、无 VREF），耳机输出的地参考随之消失 → 人声空洞甚至无声。这里在 verb 层
++	// 无条件改写为 IN+VREF80%(0x24)，0x00(断电)也一并改写，保持该脚常供电，
++	// 与原先用户态补写行为一致，但不再依赖任何系统内进程。
++	static bool vrefEnabled = false;
++	static bool vrefChecked = false;
++	if (!vrefChecked) {
++		vrefChecked = true;
++		vrefEnabled = alc274Here && !checkKernelArgument("-alc274off") && !checkKernelArgument("-alc274novref");
++	}
++	if (vrefEnabled && nid == 0x19 && verb == 0x707) {
++		// 静音键按下期间，该脚要保持"断电"状态，否则会把 VREF 灌回去让静音失效
++		uint16_t want = 0x24;
++		if (param != want) {
++			DBGLOG("alc", "vref override nid 0x19 pin ctl 0x%02X -> 0x%02X", param, want);
++			param = want;
++		}
++	}
++
++	// 开机 presence 跟随（layout 29 下默认启用，可用 -alc274nopres / -alc274off 关闭）：0x19（一体孔麦克风脚）的 pin sense 只反映
++	// "VREF 偏置有没有返回通路"，插头不动、只开 VREF 它就会从 0 变 1，因此它不代表真实插入。
++	// 开机时 AppleHDA 先把该脚写成 0x02（无 VREF）再采样，于是"插着耳机开机"被判为未插入，
++	// 输入端口不跟随。这里把它的 presence 委托给耳机脚 0x21 的真实机械检测：
++	// 插着东西才报存在，拔掉则报不存在（内建麦照常可用）。
++	static bool presEnabled = false;
++	static bool presChecked = false;
++	if (!presChecked) {
++		presChecked = true;
++		presEnabled = alc274Here && !checkKernelArgument("-alc274off") && !checkKernelArgument("-alc274nopres");
++	}
++	if (presEnabled && nid == 0x19 && verb == 0xf09 && param == 0) {
++		unsigned int hpSense = 0;
++		IOReturn ret = FunctionCast(IOHDACodecDevice_executeVerb, callbackAlc->orgIOHDACodecDevice_executeVerb)(hdaCodecDevice, 0x21, 0xf09, 0, &hpSense, waitForSuccess);
++		if (ret == kIOReturnSuccess) {
++			if (output)
++				*output = (hpSense & 0x80000000U);
++			return ret;
++		}
++	}
++
++	// 静音键（layout 29 下默认启用，可用 -alc274nokey / -alc274off 关闭）：0x1A 自锁检测脚支持。
++	// 该键按一次短接检测线并保持、再按一次释放，属于状态型开关；而 AppleHDA 在自制 layout 下
++	// 完全不接管 0x1A（通知使能位一直是 0），事件上不到上层。所以改为内核侧启动一个 300ms 的
++	// 轻量轮询：锁住即静音麦克风（两条采集链的输入放大器），释放即按原值恢复。
++	static bool keyEnabled = false;
++	static bool keyChecked = false;
++	static uint32_t keySenses = 0;
++	if (!keyChecked) {
++		keyChecked = true;
++		keyEnabled = alc274Here && !checkKernelArgument("-alc274off") && !checkKernelArgument("-alc274nokey");
++	}
++	if (keyEnabled) {
++		if (!alc274KeySelf)
++			alc274KeySelf = callbackAlc;
++		if (!alc274KeyCtx)
++			alc274KeyCtx = hdaCodecDevice;
++
++		// 事件驱动：把静音键脚 0x1A 的插孔通知挂到耳机脚 0x21 已在使用的同一个中断标签（tag 3）。
++		// 键一旦锁存/释放，codec 直接发中断，AppleHDA 必然要去读 0x21 的插孔状态，
++		// 我们就在那次读取里判断 0x1A 并执行静音/恢复，不需要任何轮询。
++		if (verb == 0x708 && (nid == 0x19 || nid == 0x21)) {
++			unsigned int keyDummy = 0;
++			alc274RawVerb(0x1A, 0x708, 0x85, &keyDummy);
++		}
++
++		// 静音态下，AppleHDA 自己改输入选择器也会被我们改写（它只在路由/采集启动时写一次，
++		// 所以这里兜住之后不需要轮询，也不会有第三方进程）
++		if (alc274KeyApplied && alc274KeyMuted) {
++			if ((nid == 0x22 || nid == 0x24) && verb == 0x701)
++				param = 0x0001;
++		}
++
++		if (verb == 0xf09 && param == 0 && (nid == 0x19 || nid == 0x21)) {
++			unsigned int k = 0;
++			if (alc274RawVerb(0x1A, 0xF09, 0x0000, &k) == kIOReturnSuccess) {
++				bool latched = (k & 0x80000000U) != 0;
++				if (!alc274KeyApplied || latched != alc274KeyMuted)
++					alc274KeyApply(latched);
++			}
++			keySenses++;
++		}
++
++		// 兜底自愈：仅 5 秒一次，用于极端情况下（上层没去读插孔状态时）补齐状态
++		if (!alc274KeyTimer) {
++			alc274KeyTimer = thread_call_allocate(alc274KeyPoll, nullptr);
++			if (alc274KeyTimer)
++				thread_call_enter_delayed(alc274KeyTimer, mach_absolute_time() + 5ULL * 1000 * 1000 * 1000);
++		}
++
++		if (keySenses) {
++			IOService *svc = (IOService *)hdaCodecDevice;
++			OSNumber *n1 = nullptr;
++			if (svc && (n1 = OSNumber::withNumber(keySenses, 32))) {
++				svc->setProperty("alc274key-senses", n1);
++				n1->release();
++			}
++			keySenses = 0;
++		}
++	}
++
+ 	if (verb & 0xff0) {
+ 		// 12 bit verb
+ 		DBGLOG("alc", "IOHDACodecDevice::executeVerb with parameters nid = 0x%02X, verb = 0x%03X, param = 0x%02X", nid, verb, param);
