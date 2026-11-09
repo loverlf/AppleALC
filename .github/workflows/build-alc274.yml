@@ -52,9 +52,20 @@ jobs:
           codesign --force --sign - --timestamp=none build/Release/AppleALC.kext
           /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" build/Release/AppleALC.kext/Contents/Info.plist
 
+      - name: Read AppleALC version
+        id: ver
+        run: |
+          set -e
+          # 版本号取自刚编出来的 kext（等于本次从上游拉到的版本，如 1.9.9）
+          ver=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" build/Release/AppleALC.kext/Contents/Info.plist)
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "本次版本: $ver"
+
       - name: Upload AppleALC.kext
         uses: actions/upload-artifact@v4
         with:
-          name: AppleALC-kext-ALC274
-          path: build/Release/AppleALC.kext
+          name: AppleALC-${{ steps.ver.outputs.version }}-AIO-16ITL
+          # 注意：必须用通配符 *，否则 upload-artifact 只打包目录内容，
+          # 解压出来就只有 Contents 文件夹、丢掉 AppleALC.kext 这一层（kext 结构不完整）
+          path: build/Release/*.kext
           if-no-files-found: error
