@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-latest   # 与官方 CI 一致；Apple Silicon runner 可交叉编译 x86_64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,11 +17,19 @@ jobs:
           set -e
           # MacKernelSDK（AppleALC 头文件依赖）
           git clone --depth 1 https://github.com/acidanthera/MacKernelSDK.git MacKernelSDK
+
           # 最新 Lilu（DEBUG 版，含头文件）
-          url=$(curl -s https://api.github.com/repos/acidanthera/Lilu/releases/latest \
-                | jq -r '.assets[] | select(.name | test("DEBUG")) | .browser_download_url' | head -1)
-          echo "Lilu: $url"
-          curl -L -o /tmp/lilu.zip "$url"
+          # 用 releases/latest 的网页跳转取版本号，不调用 GitHub API（API 匿名访问常被限流，jq 会拿到 null）
+          tag=$(curl -sI https://github.com/acidanthera/Lilu/releases/latest \
+                | tr -d '\r' | awk -F'/tag/' 'tolower($1) ~ /^location:/{print $2}' | tr -d '\n')
+          if [ -z "$tag" ]; then
+            echo "取不到最新 tag，回退到 1.7.2"
+            tag=1.7.2
+          fi
+          echo "Lilu tag: $tag"
+          curl -fL --retry 3 -o /tmp/lilu.zip \
+            "https://github.com/acidanthera/Lilu/releases/download/${tag}/Lilu-${tag}-DEBUG.zip"
+          rm -rf /tmp/lilu && mkdir -p /tmp/lilu
           unzip -q /tmp/lilu.zip -d /tmp/lilu
           cp -R /tmp/lilu/Lilu.kext ./Lilu.kext
 
@@ -33,10 +41,14 @@ jobs:
       - name: Build AppleALC
         run: |
           set -e
-          xcodebuild -project AppleALC.xcodeproj -target AppleALC \
-            -configuration Release -arch x86_64 \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
-            | tail -40
+          if ! xcodebuild -project AppleALC.xcodeproj -target AppleALC \
+              -configuration Release -arch x86_64 \
+              CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" > /tmp/build.log 2>&1; then
+            echo "===== 编译失败，最后 80 行 ====="
+            tail -80 /tmp/build.log
+            exit 1
+          fi
+          grep -E "BUILD (SUCCEEDED|FAILED)" /tmp/build.log || tail -40 /tmp/build.log
           codesign --force --sign - --timestamp=none build/Release/AppleALC.kext
           /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" build/Release/AppleALC.kext/Contents/Info.plist
 
