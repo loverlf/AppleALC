@@ -3946,19 +3946,19 @@
 					<key>AFGLowPowerState</key>
 					<data>AwAAAA==</data>
 					<key>Codec</key>
-					<string>Realtek ALC274 for Optiplex 7470 AIO</string>
+					<string>Realtek ALC274 for Lenovo Tianjiao AIO-16ITL</string>
 					<key>CodecID</key>
 					<integer>283902580</integer>
 					<key>Comment</key>
-					<string>loverlf - Realtek ALC274 for Lenovo Tianjiao 16 ALO (17aa3757, single 3.5mm combo jack)</string>
+					<string>loverlf - Realtek ALC274 for Lenovo Tianjiao AIO-16ITL(17aa3757, single 3.5mm combo jack)</string>
 					<key>ConfigData</key>
-					<data>ASccEAEnHQEBJx6mAScfkAF3HCABdx0BAXceFwF3H5ABhxwwAYcdEAGHHqsBhx8DAaccQAGnHRABpx6LAacfAwIXHFACFx0QAhceKwIXHwMBRwwCAXcMAgGnDAICFwwC</data>
+					<data>ASccMAEnHQEBJx6mAScfkAF3HBABdx0BAXceFwF3H5ABlxxAAZcdEAGXHoEBlx8CAhccIAIXHRACFx4hAhcfAgGHHPABhx0AAYceAAGHH0ABpxzwAacdAAGnHgABpx9AAXcMAgIXDAIBlwck</data>
 					<key>FuncGroup</key>
 					<integer>1</integer>
 					<key>LayoutID</key>
 					<integer>29</integer>
 					<key>WakeConfigData</key>
-					<data>AWcMAg==</data>
+					<data>AXcMAgIXDAI=</data>
 					<key>WakeVerbReinit</key>
 					<true/>
 				</dict>

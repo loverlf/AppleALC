@@ -1,5 +1,5 @@
 diff --git a/AppleALC/kern_alc.cpp b/AppleALC/kern_alc.cpp
-index 5954f1c..e7a1bb9 100644
+index 5954f1c..8108e06 100644
 --- a/AppleALC/kern_alc.cpp
 +++ b/AppleALC/kern_alc.cpp
 @@ -12,6 +12,8 @@
@@ -11,7 +11,7 @@ index 5954f1c..e7a1bb9 100644
  #include <libkern/c++/OSUnserialize.h>
  
  #include "kern_alc.hpp"
-@@ -382,8 +384,245 @@ bool AlcEnabler::AppleHDAController_start(IOService* service, IOService* provide
+@@ -382,8 +384,254 @@ bool AlcEnabler::AppleHDAController_start(IOService* service, IOService* provide
  	return FunctionCast(AppleHDAController_start, callbackAlc->orgAppleHDAController_start)(service, provider);
  }
  
@@ -146,11 +146,20 @@ index 5954f1c..e7a1bb9 100644
 +	static bool alc274Checked = false;
 +	static bool alc274Here = false;
 +	if (!alc274Checked) {
-+		// 读不到 layout（返回 0）时不锁定结论，等下一次调用再判，避免钩子被误关
-+		uint32_t alc274Layout = AlcEnabler::getAudioLayout((IOService *)hdaCodecDevice);
++		// 只认 alc-layout-id：它才是 AppleALC 最终采用的 layout（alcid / alc-layout-id / 注入都归一到这个键）。
++		// 裸 layout-id 可能是 config 里的旧注入（本机是 7），拿它判定会把钩子误关。
++		// 读不到时本次不锁定结论，等下一次调用再判。
++		IOService *alc274Codec = (IOService *)hdaCodecDevice;
++		uint32_t alc274Layout = 0;
++		for (IORegistryEntry *e = alc274Codec; e != nullptr && alc274Layout == 0; e = e->getParentEntry(gIOServicePlane)) {
++			WIOKit::getOSDataValue(e, "alc-layout-id", alc274Layout);
++		}
 +		if (alc274Layout != 0) {
 +			alc274Checked = true;
 +			alc274Here = (alc274Layout == 29);
++			uint32_t alc274Gate = alc274Here ? 1 : 0;
++			alc274Codec->setProperty("alc274-gate", &alc274Gate, sizeof(alc274Gate));
++			alc274Codec->setProperty("alc274-layout", &alc274Layout, sizeof(alc274Layout));
 +		}
 +	}
 +
